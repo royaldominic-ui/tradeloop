@@ -16,7 +16,7 @@ export default function AuthScreen() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) { Alert.alert('Error', error.message); return; }
-    router.replace('/');
+    router.replace('/(tabs)');
   };
 
   const signup = async () => {
@@ -32,7 +32,7 @@ export default function AuthScreen() {
   const googleLogin = async () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: 'http://localhost:8081' },
+      options: { redirectTo: 'http://localhost:8081/(tabs)' },
     });
     if (error) { Alert.alert('Error', error.message); return; }
     if (data?.url) {
