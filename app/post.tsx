@@ -1,34 +1,63 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { supabase } from './lib/supabase';
 
 const CONDITIONS = ['New', 'Like new', 'Good', 'Fair'];
 const CATEGORIES = [
-  { label: 'Mobiles', emoji: '📱' },
-  { label: 'Electronics', emoji: '💻' },
-  { label: 'Furniture', emoji: '🛋️' },
-  { label: 'Cars', emoji: '🚗' },
-  { label: 'Fashion', emoji: '👗' },
-  { label: 'Books', emoji: '📚' },
+  { label: 'Mobiles', emoji: '📱', id: 1 },
+  { label: 'Electronics', emoji: '💻', id: 2 },
+  { label: 'Furniture', emoji: '🛋️', id: 3 },
+  { label: 'Cars', emoji: '🚗', id: 4 },
+  { label: 'Fashion', emoji: '👗', id: 5 },
+  { label: 'Books', emoji: '📚', id: 6 },
 ];
 
 export default function PostScreen() {
   const [condition, setCondition] = useState('Good');
-  const [category, setCategory] = useState('Mobiles');
+  const [category, setCategory] = useState(CATEGORIES[0]);
   const [friendsFirst, setFriendsFirst] = useState(true);
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [desc, setDesc] = useState('');
+  const [loading, setLoading] = useState(false);
+
+const publish = async () => {
+  if (!title.trim()) { Alert.alert('Please add a title'); return; }
+  if (!price.trim()) { Alert.alert('Please add a price'); return; }
+  setLoading(true);
+  try {
+    const { error } = await supabase.from('listings').insert({
+      seller_id: '00000000-0000-0000-0000-000000000000',
+      title: title.trim(),
+      description: desc.trim(),
+      price: parseFloat(price),
+      condition: condition.toLowerCase().replace(' ', '_'),
+      location_name: 'Chennai',
+      category_id: category.id,
+      status: 'active',
+    });
+    if (error) { Alert.alert('Error', error.message); return; }
+    Alert.alert('Success! 🎉', 'Your listing is now live!', [
+      { text: 'View Feed', onPress: () => router.replace('/(tabs)') }
+    ]);
+  } catch (e: any) {
+    Alert.alert('Error', e.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <SafeAreaView style={s.root}>
-      {/* Header */}
       <View style={s.header}>
-        <Text style={s.close}>✕</Text>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={s.close}>✕</Text>
+        </TouchableOpacity>
         <Text style={s.headerTitle}>New listing</Text>
         <Text style={s.draft}>Save draft</Text>
       </View>
 
-      {/* Progress */}
       <View style={s.progress}>
         {[0,1,2,3].map(i => (
           <View key={i} style={[s.progressPip, i <= 1 && s.progressDone, i === 2 && s.progressActive]} />
@@ -36,21 +65,19 @@ export default function PostScreen() {
       </View>
 
       <ScrollView style={s.scroll} contentContainerStyle={s.body}>
-
-        {/* Photos */}
         <Text style={s.label}>Photos <Text style={s.labelSub}>(3 of 5 added)</Text></Text>
         <View style={s.photoGrid}>
           <View style={[s.photoSlot, { backgroundColor: '#1C1040' }]}>
-            <Text style={{ fontSize: 28 }}>📱</Text>
+            <Text style={{ fontSize: 28 }}>{category.emoji}</Text>
             <View style={s.coverBadge}><Text style={s.coverTxt}>COVER</Text></View>
             <TouchableOpacity style={s.delBtn}><Text style={s.delTxt}>✕</Text></TouchableOpacity>
           </View>
           <View style={[s.photoSlot, { backgroundColor: '#1C1040' }]}>
-            <Text style={{ fontSize: 28 }}>📱</Text>
+            <Text style={{ fontSize: 28 }}>{category.emoji}</Text>
             <TouchableOpacity style={s.delBtn}><Text style={s.delTxt}>✕</Text></TouchableOpacity>
           </View>
           <View style={[s.photoSlot, { backgroundColor: '#1C1040' }]}>
-            <Text style={{ fontSize: 28 }}>📱</Text>
+            <Text style={{ fontSize: 28 }}>{category.emoji}</Text>
             <TouchableOpacity style={s.delBtn}><Text style={s.delTxt}>✕</Text></TouchableOpacity>
           </View>
           <TouchableOpacity style={s.photoAdd}>
@@ -59,7 +86,6 @@ export default function PostScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Title */}
         <Text style={s.label}>Title</Text>
         <TextInput
           style={s.input}
@@ -74,7 +100,6 @@ export default function PostScreen() {
           <Text style={s.aiApply}>Apply</Text>
         </View>
 
-        {/* Description */}
         <Text style={s.label}>Description</Text>
         <TextInput
           style={[s.input, s.textarea]}
@@ -86,7 +111,6 @@ export default function PostScreen() {
           numberOfLines={3}
         />
 
-        {/* Condition */}
         <Text style={s.label}>Condition</Text>
         <View style={s.condRow}>
           {CONDITIONS.map(c => (
@@ -96,7 +120,6 @@ export default function PostScreen() {
           ))}
         </View>
 
-        {/* Price */}
         <Text style={s.label}>Price</Text>
         <View style={s.priceRow}>
           <Text style={s.priceSym}>₹</Text>
@@ -113,18 +136,16 @@ export default function PostScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Category */}
         <Text style={s.label}>Category</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
           {CATEGORIES.map(cat => (
-            <TouchableOpacity key={cat.label} style={[s.catChip, category === cat.label && s.catChipActive]} onPress={() => setCategory(cat.label)}>
+            <TouchableOpacity key={cat.label} style={[s.catChip, category.label === cat.label && s.catChipActive]} onPress={() => setCategory(cat)}>
               <Text style={{ fontSize: 16 }}>{cat.emoji}</Text>
-              <Text style={[s.catTxt, category === cat.label && s.catTxtActive]}>{cat.label}</Text>
+              <Text style={[s.catTxt, category.label === cat.label && s.catTxtActive]}>{cat.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {/* Location */}
         <Text style={s.label}>Location</Text>
         <TouchableOpacity style={s.locationRow}>
           <Text style={{ fontSize: 14 }}>📍</Text>
@@ -132,7 +153,6 @@ export default function PostScreen() {
           <Text style={s.locationChange}>Change</Text>
         </TouchableOpacity>
 
-        {/* Friends first toggle */}
         <View style={s.toggleRow}>
           <View style={{ flex: 1 }}>
             <Text style={s.toggleName}>Sell to friends first</Text>
@@ -146,10 +166,9 @@ export default function PostScreen() {
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* Publish button */}
       <View style={s.ctaWrap}>
-        <TouchableOpacity style={s.publishBtn}>
-          <Text style={s.publishTxt}>Publish listing →</Text>
+        <TouchableOpacity style={[s.publishBtn, loading && { opacity: 0.6 }]} onPress={publish} disabled={loading}>
+          <Text style={s.publishTxt}>{loading ? 'Publishing...' : 'Publish listing →'}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
