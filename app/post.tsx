@@ -43,32 +43,35 @@ export default function PostScreen() {
 
 const uploadImages = async (listingId: string) => {
   for (let i = 0; i < images.length; i++) {
-    const { uri } = images[i];
+    const { uri, base64 } = images[i];
     const fileName = `${listingId}/${i}.jpg`;
-    
-    const formData = new FormData();
-    formData.append('file', {
-      uri,
-      name: `${i}.jpg`,
-      type: 'image/jpeg',
-    } as any);
 
-    const { error } = await supabase.storage
-      .from('listing-images')
-      .upload(fileName, formData, {
-        contentType: 'multipart/form-data',
-        upsert: true,
-      });
+    if (base64) {
+      // Convert base64 to ArrayBuffer
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let j = 0; j < binaryString.length; j++) {
+        bytes[j] = binaryString.charCodeAt(j);
+      }
 
-    if (!error) {
-      const { data } = supabase.storage.from('listing-images').getPublicUrl(fileName);
-      await supabase.from('listing_images').insert({
-        listing_id: listingId,
-        url: data.publicUrl,
-        position: i,
-      });
-    } else {
-      console.log('Upload error:', error.message);
+      const { error } = await supabase.storage
+        .from('listing-images')
+        .upload(fileName, bytes.buffer, {
+          contentType: 'image/jpeg',
+          upsert: true,
+        });
+
+      if (!error) {
+        const { data } = supabase.storage.from('listing-images').getPublicUrl(fileName);
+        await supabase.from('listing_images').insert({
+          listing_id: listingId,
+          url: data.publicUrl,
+          position: i,
+        });
+      } else {
+        console.log('Upload error:', JSON.stringify(error));
+        alert('Image upload error: ' + error.message);
+      }
     }
   }
 };
