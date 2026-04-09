@@ -22,38 +22,42 @@ export default function PostScreen() {
   const [price, setPrice] = useState('');
   const [desc, setDesc] = useState('');
   const [loading, setLoading] = useState(false);
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<{ uri: string; base64: string }[]>([]);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      quality: 0.8,
+      quality: 0.7,
       selectionLimit: 5,
+      base64: true,
     });
     if (!result.canceled) {
-      const uris = result.assets.map(a => a.uri);
-      setImages(prev => [...prev, ...uris].slice(0, 5));
+      const newImages = result.assets.map(a => ({
+        uri: a.uri,
+        base64: a.base64 ?? '',
+      }));
+      setImages(prev => [...prev, ...newImages].slice(0, 5));
     }
   };
 
   const uploadImages = async (listingId: string) => {
     for (let i = 0; i < images.length; i++) {
-      const uri = images[i];
-      const ext = uri.split('.').pop() ?? 'jpg';
-      const fileName = `${listingId}/${i}.${ext}`;
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      await supabase.storage.from('listing-images').upload(fileName, blob, {
-        contentType: `image/${ext}`,
-        upsert: true,
-      });
-      const { data } = supabase.storage.from('listing-images').getPublicUrl(fileName);
-      await supabase.from('listing_images').insert({
-        listing_id: listingId,
-        url: data.publicUrl,
-        position: i,
-      });
+      const { base64 } = images[i];
+      if (!base64) continue;
+      const fileName = `${listingId}/${i}.jpg`;
+      const byteArray = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      const { error } = await supabase.storage
+        .from('listing-images')
+        .upload(fileName, byteArray, { contentType: 'image/jpeg', upsert: true });
+      if (!error) {
+        const { data } = supabase.storage.from('listing-images').getPublicUrl(fileName);
+        await supabase.from('listing_images').insert({
+          listing_id: listingId,
+          url: data.publicUrl,
+          position: i,
+        });
+      }
     }
   };
 
@@ -61,10 +65,8 @@ export default function PostScreen() {
     if (!title.trim()) { alert('Please add a title'); return; }
     if (!price.trim()) { alert('Please add a price'); return; }
     setLoading(true);
-
     const { data: sessionData } = await supabase.auth.getSession();
     const sellerId = sessionData?.session?.user?.id ?? null;
-
     const insertData: any = {
       title: title.trim(),
       description: desc.trim(),
@@ -75,23 +77,10 @@ export default function PostScreen() {
       status: 'active',
     };
     if (sellerId) insertData.seller_id = sellerId;
-
     const { data: listing, error } = await supabase
-      .from('listings')
-      .insert(insertData)
-      .select('id')
-      .single();
-
-    if (error) {
-      setLoading(false);
-      alert('Failed: ' + error.message);
-      return;
-    }
-
-    if (images.length > 0) {
-      await uploadImages(listing.id);
-    }
-
+      .from('listings').insert(insertData).select('id').single();
+    if (error) { setLoading(false); alert('Failed: ' + error.message); return; }
+    if (images.length > 0) await uploadImages(listing.id);
     setLoading(false);
     alert('Success! Your listing is live!');
     router.replace('/(tabs)');
@@ -106,13 +95,12 @@ export default function PostScreen() {
         <Text style={s.headerTitle}>New listing</Text>
         <Text style={s.draft}>Save draft</Text>
       </View>
-
       <ScrollView style={s.scroll} contentContainerStyle={s.body}>
         <Text style={s.label}>Photos <Text style={s.labelSub}>({images.length} of 5 added)</Text></Text>
         <View style={s.photoGrid}>
-          {images.map((uri, i) => (
+          {images.map((img, i) => (
             <View key={i} style={s.photoSlot}>
-              <Image source={{ uri }} style={s.photoImg} />
+              <Image source={{ uri: img.uri }} style={s.photoImg} />
               {i === 0 && <View style={s.coverBadge}><Text style={s.coverTxt}>COVER</Text></View>}
               <TouchableOpacity style={s.delBtn} onPress={() => setImages(imgs => imgs.filter((_, j) => j !== i))}>
                 <Text style={s.delTxt}>✕</Text>
@@ -126,13 +114,10 @@ export default function PostScreen() {
             </TouchableOpacity>
           )}
         </View>
-
         <Text style={s.label}>Title</Text>
         <TextInput style={s.input} value={title} onChangeText={setTitle} placeholder="e.g. iPhone 11 128GB Black" placeholderTextColor="#5A6080" />
-
         <Text style={s.label}>Description</Text>
         <TextInput style={[s.input, s.textarea]} value={desc} onChangeText={setDesc} placeholder="Describe the item..." placeholderTextColor="#5A6080" multiline numberOfLines={3} />
-
         <Text style={s.label}>Condition</Text>
         <View style={s.condRow}>
           {CONDITIONS.map(c => (
@@ -141,13 +126,11 @@ export default function PostScreen() {
             </TouchableOpacity>
           ))}
         </View>
-
         <Text style={s.label}>Price</Text>
         <View style={s.priceRow}>
           <Text style={s.priceSym}>₹</Text>
           <TextInput style={s.priceInput} value={price} onChangeText={setPrice} placeholder="0" placeholderTextColor="#5A6080" keyboardType="number-pad" />
         </View>
-
         <Text style={s.label}>Category</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.catScroll}>
           {CATEGORIES.map(cat => (
@@ -157,14 +140,12 @@ export default function PostScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-
         <Text style={s.label}>Location</Text>
         <TouchableOpacity style={s.locationRow}>
           <Text style={{ fontSize: 14 }}>📍</Text>
           <Text style={s.locationTxt}>Keelkattalai, Chennai</Text>
           <Text style={s.locationChange}>Change</Text>
         </TouchableOpacity>
-
         <View style={s.toggleRow}>
           <View style={{ flex: 1 }}>
             <Text style={s.toggleName}>Sell to friends first</Text>
@@ -174,10 +155,8 @@ export default function PostScreen() {
             <View style={[s.toggleKnob, !friendsFirst && s.toggleKnobOff]} />
           </TouchableOpacity>
         </View>
-
         <View style={{ height: 20 }} />
       </ScrollView>
-
       <View style={s.ctaWrap}>
         <TouchableOpacity style={[s.publishBtn, loading && { opacity: 0.6 }]} onPress={publish} disabled={loading}>
           <Text style={s.publishTxt}>{loading ? 'Uploading & publishing...' : 'Publish listing →'}</Text>
