@@ -66,7 +66,7 @@ export default function HomeScreen() {
   const onRefresh = () => { setRefreshing(true); loadListings(); };
 
   const renderItem = ({ item, index }: { item: any; index: number }) => (
-    <TouchableOpacity style={s.card} onPress={() => router.push('/listing')}>
+    <TouchableOpacity style={s.card} onPress={() => router.push({ pathname: '/listing', params: { id: item.id } })}>
       <View style={[s.thumb, { backgroundColor: item.color ?? COLORS[index % COLORS.length] }]}>
         <Text style={s.emoji}>{item.emoji ?? '📦'}</Text>
       </View>
