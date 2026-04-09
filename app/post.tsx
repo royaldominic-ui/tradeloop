@@ -41,25 +41,37 @@ export default function PostScreen() {
     }
   };
 
-  const uploadImages = async (listingId: string) => {
-    for (let i = 0; i < images.length; i++) {
-      const { base64 } = images[i];
-      if (!base64) continue;
-      const fileName = `${listingId}/${i}.jpg`;
-      const byteArray = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
-      const { error } = await supabase.storage
-        .from('listing-images')
-        .upload(fileName, byteArray, { contentType: 'image/jpeg', upsert: true });
-      if (!error) {
-        const { data } = supabase.storage.from('listing-images').getPublicUrl(fileName);
-        await supabase.from('listing_images').insert({
-          listing_id: listingId,
-          url: data.publicUrl,
-          position: i,
-        });
-      }
+const uploadImages = async (listingId: string) => {
+  for (let i = 0; i < images.length; i++) {
+    const { uri } = images[i];
+    const fileName = `${listingId}/${i}.jpg`;
+    
+    const formData = new FormData();
+    formData.append('file', {
+      uri,
+      name: `${i}.jpg`,
+      type: 'image/jpeg',
+    } as any);
+
+    const { error } = await supabase.storage
+      .from('listing-images')
+      .upload(fileName, formData, {
+        contentType: 'multipart/form-data',
+        upsert: true,
+      });
+
+    if (!error) {
+      const { data } = supabase.storage.from('listing-images').getPublicUrl(fileName);
+      await supabase.from('listing_images').insert({
+        listing_id: listingId,
+        url: data.publicUrl,
+        position: i,
+      });
+    } else {
+      console.log('Upload error:', error.message);
     }
-  };
+  }
+};
 
   const publish = async () => {
     if (!title.trim()) { alert('Please add a title'); return; }
