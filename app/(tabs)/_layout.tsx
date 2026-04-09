@@ -5,7 +5,6 @@ export default function TabLayout() {
     <Tabs screenOptions={{ headerShown: false, tabBarStyle: { display: 'none' } }}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="explore" options={{ href: null }} />
-      <Tabs.Screen name="post" options={{ href: null }} />
     </Tabs>
   );
 }
